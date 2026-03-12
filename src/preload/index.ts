@@ -50,7 +50,18 @@ const api = {
   // Calibration
   recordCalibrationPoint: (x: number, y: number) =>
     ipcRenderer.invoke('calibration:record-point', x, y),
-  finishCalibration: () => ipcRenderer.invoke('calibration:finish')
+  finishCalibration: () => ipcRenderer.invoke('calibration:finish'),
+  startCalibration: () => ipcRenderer.invoke('calibration:start'),
+
+  // Main window controls
+  toggleTracking: () => ipcRenderer.invoke('tracking:toggle'),
+  toggleDebug: () => ipcRenderer.invoke('debug:toggle'),
+  onTrackingState: (callback: (state: { enabled: boolean; fps: number; confidence: number }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: { enabled: boolean; fps: number; confidence: number }): void =>
+      callback(state)
+    ipcRenderer.on('tracking:state', listener)
+    return () => ipcRenderer.removeListener('tracking:state', listener)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

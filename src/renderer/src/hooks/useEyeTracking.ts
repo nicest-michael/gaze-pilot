@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
-import webgazer from 'webgazer'
 import { useWinkDetection } from './useWinkDetection'
 import { useTrackingStore } from '../store/tracking-store'
 import type { GestureEvent, GazePoint, EyeState, DebugData } from '../../../shared/types'
@@ -13,6 +12,7 @@ interface TrackingRefs {
   video: HTMLVideoElement | null
   faceLandmarker: FaceLandmarker | null
   webgazerReady: boolean
+  webgazerModule: any | null
   rafId: number | null
   fpsInterval: ReturnType<typeof setInterval> | null
   frameCount: number
@@ -29,6 +29,7 @@ function createRefs(): TrackingRefs {
     video: null,
     faceLandmarker: null,
     webgazerReady: false,
+    webgazerModule: null,
     rafId: null,
     fpsInterval: null,
     frameCount: 0,
@@ -83,13 +84,14 @@ export function useEyeTracking(): void {
       r.faceLandmarker = null
     }
 
-    if (r.webgazerReady) {
+    if (r.webgazerReady && r.webgazerModule) {
       try {
-        webgazer.end()
+        r.webgazerModule.end()
       } catch {
         // ignore
       }
       r.webgazerReady = false
+      r.webgazerModule = null
     }
 
     if (r.stream) {
@@ -153,17 +155,28 @@ export function useEyeTracking(): void {
       // Continue without MediaPipe - WebGazer may still work
     }
 
-    // Init WebGazer
+    // Init WebGazer with dynamic import - let it manage its own camera
     try {
-      webgazer
-        .setRegression('ridge')
+      const wg = (await import('webgazer')).default
+      wg.setRegression('ridge')
         .showVideoPreview(false)
         .showPredictionPoints(false)
         .showFaceOverlay(false)
         .showFaceFeedbackBox(false)
-      await webgazer.begin()
+      await wg.begin()
       r.webgazerReady = true
+      r.webgazerModule = wg
       r.log += 'WebGazer ready. '
+
+      // Hide any DOM elements WebGazer created
+      const wgVideo = document.getElementById('webgazerVideoFeed')
+      if (wgVideo) wgVideo.style.display = 'none'
+      const wgCanvas = document.getElementById('webgazerVideoCanvas')
+      if (wgCanvas) (wgCanvas as HTMLElement).style.display = 'none'
+      const wgFace = document.getElementById('webgazerFaceOverlay')
+      if (wgFace) wgFace.style.display = 'none'
+      const wgFace2 = document.getElementById('webgazerFaceFeedbackBox')
+      if (wgFace2) wgFace2.style.display = 'none'
     } catch (err) {
       r.log += `WebGazer failed: ${err}. `
       // Continue without WebGazer - wink detection may still work
@@ -211,9 +224,9 @@ export function useEyeTracking(): void {
 
       // WebGazer gaze prediction
       let gazePoint: GazePoint | null = null
-      if (r.webgazerReady) {
+      if (r.webgazerReady && r.webgazerModule) {
         try {
-          const prediction = webgazer.getCurrentPrediction()
+          const prediction = r.webgazerModule.getCurrentPrediction()
           if (prediction && prediction.x != null && prediction.y != null) {
             const raw: GazePoint = { x: prediction.x, y: prediction.y, confidence: 0.8 }
             r.gazeBuffer.push(raw)

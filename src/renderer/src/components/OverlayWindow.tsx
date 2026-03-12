@@ -23,10 +23,13 @@ export function OverlayWindow(): JSX.Element {
     <div
       className="fixed pointer-events-none"
       style={{
-        left: pos.x - 12,
-        top: pos.y - 12,
+        left: 0,
+        top: 0,
         width: 24,
-        height: 24
+        height: 24,
+        transform: `translate(${pos.x - 12}px, ${pos.y - 12}px)`,
+        transition: 'transform 50ms linear',
+        willChange: 'transform'
       }}
     >
       {/* Outer ring */}

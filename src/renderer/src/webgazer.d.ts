@@ -1,15 +1,18 @@
 declare module 'webgazer' {
-  const webgazer: {
-    setRegression(type: string): typeof webgazer
-    showVideoPreview(show: boolean): typeof webgazer
-    showPredictionPoints(show: boolean): typeof webgazer
-    showFaceOverlay(show: boolean): typeof webgazer
-    showFaceFeedbackBox(show: boolean): typeof webgazer
-    begin(): Promise<typeof webgazer>
-    pause(): typeof webgazer
-    end(): typeof webgazer
-    recordScreenPosition(x: number, y: number, type: string): typeof webgazer
+  interface WebGazer {
+    setRegression(type: string): WebGazer
+    showVideoPreview(show: boolean): WebGazer
+    showPredictionPoints(show: boolean): WebGazer
+    showFaceOverlay(show: boolean): WebGazer
+    showFaceFeedbackBox(show: boolean): WebGazer
+    begin(): Promise<WebGazer>
+    pause(): WebGazer
+    end(): WebGazer
+    recordScreenPosition(x: number, y: number, type: string): WebGazer
     getCurrentPrediction(): { x: number; y: number } | null
   }
+
+  /** Default export — works with both `import webgazer` and `(await import('webgazer')).default` */
+  const webgazer: WebGazer
   export default webgazer
 }

@@ -11,6 +11,12 @@ const GESTURE_COLORS: Record<GestureState, string> = {
 
 const MAX_LOGS = 100
 
+function isDebugData(raw: unknown): raw is DebugData {
+  if (typeof raw !== 'object' || raw === null) return false
+  const obj = raw as Record<string, unknown>
+  return typeof obj.fps === 'number' && typeof obj.confidence === 'number'
+}
+
 export function DebugWindow(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -22,10 +28,11 @@ export function DebugWindow(): JSX.Element {
   const [logs, setLogs] = useState<string[]>([])
   const [cameraReady, setCameraReady] = useState(false)
 
-  // Start camera with delay
+  // Start camera immediately
   useEffect(() => {
     let cancelled = false
-    const timer = setTimeout(async () => {
+
+    ;(async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 640, height: 480 }
@@ -43,11 +50,10 @@ export function DebugWindow(): JSX.Element {
       } catch (err) {
         console.error('Debug camera failed:', err)
       }
-    }, 2000)
+    })()
 
     return () => {
       cancelled = true
-      clearTimeout(timer)
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream
         stream.getTracks().forEach((t) => t.stop())
@@ -119,7 +125,8 @@ export function DebugWindow(): JSX.Element {
   // Listen for debug data from main
   useEffect(() => {
     const cleanup = window.api.onDebugData((raw: unknown) => {
-      const data = raw as DebugData
+      if (!isDebugData(raw)) return
+      const data = raw
       debugDataRef.current = data
       setStats(data)
       if (data.log) {
@@ -209,7 +216,17 @@ export function DebugWindow(): JSX.Element {
         </div>
 
         {/* Logs */}
-        <div className="text-white/50 text-[10px] uppercase tracking-wider">Logs</div>
+        <div className="flex items-center justify-between">
+          <div className="text-white/50 text-[10px] uppercase tracking-wider">Logs</div>
+          {logs.length > 0 && (
+            <button
+              onClick={() => setLogs([])}
+              className="text-[10px] text-white/40 hover:text-white/70 transition-colors px-1"
+            >
+              Clear
+            </button>
+          )}
+        </div>
         <div
           ref={logContainerRef}
           className="flex-1 overflow-y-auto bg-white/5 rounded p-2 space-y-0.5"

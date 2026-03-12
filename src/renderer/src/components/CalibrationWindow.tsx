@@ -12,6 +12,7 @@ const DWELL_MS = 2000
 
 export function CalibrationWindow(): JSX.Element {
   const [active, setActive] = useState(false)
+  const [complete, setComplete] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [progress, setProgress] = useState(0)
   const startTimeRef = useRef<number>(0)
@@ -27,8 +28,11 @@ export function CalibrationWindow(): JSX.Element {
     if (nextIndex >= CALIBRATION_POINTS.length) {
       window.api.finishCalibration()
       setActive(false)
+      setComplete(true)
       setCurrentIndex(0)
       setProgress(0)
+      // Show completion message briefly before hiding
+      setTimeout(() => setComplete(false), 1500)
     } else {
       setCurrentIndex(nextIndex)
       setProgress(0)
@@ -68,7 +72,17 @@ export function CalibrationWindow(): JSX.Element {
     return cleanup
   }, [])
 
-  if (!active) return <></>
+  if (!active && !complete) return <></>
+
+  if (complete) {
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
+        <div className="text-green-400 text-2xl font-mono animate-pulse">
+          Calibration Complete!
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center">

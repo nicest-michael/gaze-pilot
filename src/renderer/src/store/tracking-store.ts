@@ -32,6 +32,12 @@ interface TrackingStore {
 
 const DEFAULT_EYE_STATE: EyeState = { leftOpen: true, rightOpen: true, leftEAR: 0.3, rightEAR: 0.3 }
 
+/**
+ * Zustand store for eye-tracking state. Can be used as:
+ * - A React hook: `const { gazePoint } = useTrackingStore()`
+ * - Direct state access outside React: `useTrackingStore.getState().gazePoint`
+ *   (e.g., `const store = useTrackingStore; store.getState().setGazePoint(...)`)
+ */
 export const useTrackingStore = create<TrackingStore>((set) => ({
   enabled: false,
   calibrated: false,
