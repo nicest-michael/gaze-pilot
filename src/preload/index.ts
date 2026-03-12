@@ -59,7 +59,18 @@ const api = {
   recordCalibrationPoint: (x: number, y: number) =>
     ipcRenderer.invoke('calibration:record-point', x, y),
   finishCalibration: () => ipcRenderer.invoke('calibration:finish'),
-  startCalibration: () => ipcRenderer.invoke('calibration:start'),
+  startCalibration: (displayId?: number) => ipcRenderer.invoke('calibration:start', displayId),
+
+  // Display info
+  getDisplays: () => ipcRenderer.invoke('displays:list') as Promise<Array<{
+    id: number
+    label: string
+    width: number
+    height: number
+    x: number
+    y: number
+    primary: boolean
+  }>>,
 
   // Main window controls
   toggleTracking: () => ipcRenderer.invoke('tracking:toggle'),

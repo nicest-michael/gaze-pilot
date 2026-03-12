@@ -88,8 +88,11 @@ function createOverlayWindow(): BrowserWindow {
   return win
 }
 
-function createCalibrationWindow(): BrowserWindow {
-  const display = screen.getPrimaryDisplay()
+function createCalibrationWindow(displayId?: number): BrowserWindow {
+  const allDisplays = screen.getAllDisplays()
+  const display = displayId
+    ? allDisplays.find((d) => d.id === displayId) ?? screen.getPrimaryDisplay()
+    : screen.getPrimaryDisplay()
   const win = new BrowserWindow({
     x: display.bounds.x,
     y: display.bounds.y,
@@ -259,17 +262,33 @@ function registerIpcHandlers(): void {
     return { enabled: trackingEnabled }
   })
 
-  ipcMain.handle('calibration:start', () => {
+  ipcMain.handle('calibration:start', (_event, displayId?: number) => {
     if (!trackingEnabled) {
       return { ok: false, error: 'Tracking must be enabled first' }
     }
-    // Create a fullscreen calibration window
+    // Create a fullscreen calibration window on the selected display
     if (calibrationWindow && !calibrationWindow.isDestroyed()) {
       calibrationWindow.focus()
     } else {
-      calibrationWindow = createCalibrationWindow()
+      calibrationWindow = createCalibrationWindow(displayId)
     }
     return { ok: true }
+  })
+
+  // Display enumeration
+  ipcMain.handle('displays:list', () => {
+    const displays = screen.getAllDisplays()
+    return displays.map((d, i) => ({
+      id: d.id,
+      label: d.id === screen.getPrimaryDisplay().id
+        ? `Display ${i + 1} (Primary)`
+        : `Display ${i + 1}`,
+      width: d.bounds.width,
+      height: d.bounds.height,
+      x: d.bounds.x,
+      y: d.bounds.y,
+      primary: d.id === screen.getPrimaryDisplay().id
+    }))
   })
 }
 
@@ -303,4 +322,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   globalShortcut.unregisterAll()
+  // Destroy all windows to trigger renderer cleanup (camera streams)
+  for (const win of [trackingWindow, overlayWindow, calibrationWindow, mainWindow]) {
+    if (win && !win.isDestroyed()) {
+      win.destroy()
+    }
+  }
 })

@@ -275,9 +275,13 @@ export function useEyeTracking(): void {
       stopTracking()
     })
 
+    // Ensure camera is released on app close
+    window.addEventListener('beforeunload', stopTracking)
+
     return () => {
       cleanupStart()
       cleanupStop()
+      window.removeEventListener('beforeunload', stopTracking)
       stopTracking()
     }
   }, [startTracking, stopTracking])

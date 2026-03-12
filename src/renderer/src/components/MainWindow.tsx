@@ -17,6 +17,16 @@ function isDebugData(raw: unknown): raw is DebugData {
   return typeof obj.fps === 'number' && typeof obj.confidence === 'number'
 }
 
+interface DisplayInfo {
+  id: number
+  label: string
+  width: number
+  height: number
+  x: number
+  y: number
+  primary: boolean
+}
+
 export function MainWindow(): JSX.Element {
   const [tracking, setTracking] = useState(false)
   const [fps, setFps] = useState(0)
@@ -24,6 +34,8 @@ export function MainWindow(): JSX.Element {
   const [debugData, setDebugData] = useState<DebugData | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   const [cameraReady, setCameraReady] = useState(false)
+  const [displays, setDisplays] = useState<DisplayInfo[]>([])
+  const [showDisplayPicker, setShowDisplayPicker] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -81,12 +93,22 @@ export function MainWindow(): JSX.Element {
       }
     })()
 
-    return () => {
-      cancelled = true
+    const stopCamera = (): void => {
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream
         stream.getTracks().forEach((t) => t.stop())
+        videoRef.current.srcObject = null
       }
+      videoRef.current = null
+    }
+
+    // Stop camera on page unload (app close)
+    window.addEventListener('beforeunload', stopCamera)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('beforeunload', stopCamera)
+      stopCamera()
     }
   }, [])
 
@@ -186,12 +208,49 @@ export function MainWindow(): JSX.Element {
 
         {/* Calibrate button */}
         <button
-          onClick={() => window.api.startCalibration()}
+          onClick={async () => {
+            const d = await window.api.getDisplays()
+            setDisplays(d)
+            if (d.length === 1) {
+              // Single display — calibrate immediately
+              window.api.startCalibration(d[0].id)
+            } else {
+              setShowDisplayPicker(true)
+            }
+          }}
           disabled={!tracking}
-          className="w-full px-4 py-2.5 rounded-lg bg-blue-500/20 border border-blue-500/50 text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-blue-500/30 mb-5 text-sm font-medium"
+          className="w-full px-4 py-2.5 rounded-lg bg-blue-500/20 border border-blue-500/50 text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-blue-500/30 mb-3 text-sm font-medium"
         >
           Calibrate
         </button>
+
+        {/* Display picker */}
+        {showDisplayPicker && (
+          <div className="bg-white/5 rounded-lg p-3 mb-5 space-y-2">
+            <div className="text-white/50 text-[10px] uppercase tracking-wider">Select Display</div>
+            {displays.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => {
+                  setShowDisplayPicker(false)
+                  window.api.startCalibration(d.id)
+                }}
+                className="w-full px-3 py-2 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300 hover:bg-blue-500/20 text-xs text-left transition-colors"
+              >
+                <div className="font-medium">{d.label}</div>
+                <div className="text-white/40">{d.width} x {d.height}</div>
+              </button>
+            ))}
+            <button
+              onClick={() => setShowDisplayPicker(false)}
+              className="w-full text-[10px] text-white/30 hover:text-white/50 pt-1"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {!showDisplayPicker && <div className="mb-2" />}
 
         {/* Live stats */}
         {tracking && (
