@@ -9,4 +9,9 @@
   body {
     @apply bg-neutral-900 text-white antialiased;
   }
+
+  body.overlay-mode {
+    background: transparent !important;
+    overflow: hidden;
+  }
 }
