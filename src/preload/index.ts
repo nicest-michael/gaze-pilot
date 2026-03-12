@@ -26,6 +26,14 @@ const api = {
     return () => ipcRenderer.removeListener('calibration:start', listener)
   },
 
+  // Main -> tracking window: receive calibration points to feed to WebGazer
+  onCalibrationPoint: (callback: (x: number, y: number) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, x: number, y: number): void =>
+      callback(x, y)
+    ipcRenderer.on('calibration:point', listener)
+    return () => ipcRenderer.removeListener('calibration:point', listener)
+  },
+
   // Main -> overlay window
   onSetCursor: (callback: (x: number, y: number) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, x: number, y: number): void =>
@@ -40,7 +48,7 @@ const api = {
     return () => ipcRenderer.removeListener('overlay:set-visible', listener)
   },
 
-  // Main -> debug window
+  // Main -> main window: debug data
   onDebugData: (callback: (data: unknown) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: unknown): void => callback(data)
     ipcRenderer.on('debug:data', listener)
@@ -55,7 +63,6 @@ const api = {
 
   // Main window controls
   toggleTracking: () => ipcRenderer.invoke('tracking:toggle'),
-  toggleDebug: () => ipcRenderer.invoke('debug:toggle'),
   onTrackingState: (callback: (state: { enabled: boolean; fps: number; confidence: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: { enabled: boolean; fps: number; confidence: number }): void =>
       callback(state)

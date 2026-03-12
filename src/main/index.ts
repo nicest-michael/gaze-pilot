@@ -1,16 +1,16 @@
 /**
  * Electron main process entry point for Gaze Pilot.
- * Creates main (UI), tracking (hidden), overlay (transparent), and debug (optional) windows.
+ * Creates main (UI), tracking (hidden), overlay (transparent), and calibration (fullscreen) windows.
  * Routes IPC between windows and handles gesture-to-action mapping.
  */
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { KeySimulator } from './services/key-simulator'
 
 let mainWindow: BrowserWindow | null = null
 let trackingWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
-let debugWindow: BrowserWindow | null = null
+let calibrationWindow: BrowserWindow | null = null
 let trackingEnabled = false
 let cursorVisible = false
 let latestGazePoint: { x: number; y: number } | null = null
@@ -21,7 +21,7 @@ const keySimulator = new KeySimulator()
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 500,
+    width: 900,
     height: 700,
     title: 'Gaze Pilot',
     webPreferences: {
@@ -88,11 +88,17 @@ function createOverlayWindow(): BrowserWindow {
   return win
 }
 
-function createDebugWindow(): BrowserWindow {
+function createCalibrationWindow(): BrowserWindow {
+  const display = screen.getPrimaryDisplay()
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
-    title: 'Gaze Pilot - Debug',
+    x: display.bounds.x,
+    y: display.bounds.y,
+    width: display.bounds.width,
+    height: display.bounds.height,
+    fullscreen: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -100,13 +106,18 @@ function createDebugWindow(): BrowserWindow {
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#/debug`)
+    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#/calibration`)
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/debug' })
+    win.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/calibration' })
   }
 
   win.on('closed', () => {
-    debugWindow = null
+    calibrationWindow = null
+  })
+
+  // Auto-start calibration once window is ready
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.send('calibration:start')
   })
 
   return win
@@ -114,12 +125,12 @@ function createDebugWindow(): BrowserWindow {
 
 // --- Tracking toggle ---
 
-function broadcastTrackingState(): void {
+function broadcastTrackingState(fps?: number, confidence?: number): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('tracking:state', {
       enabled: trackingEnabled,
-      fps: 0,
-      confidence: 0
+      fps: fps ?? 0,
+      confidence: confidence ?? 0
     })
   }
 }
@@ -142,15 +153,6 @@ function toggleTracking(): void {
 
   broadcastTrackingState()
   console.log(`[gaze-pilot] Tracking ${trackingEnabled ? 'enabled' : 'disabled'}`)
-}
-
-function toggleDebugWindow(): void {
-  if (debugWindow && !debugWindow.isDestroyed()) {
-    debugWindow.close()
-    debugWindow = null
-  } else {
-    debugWindow = createDebugWindow()
-  }
 }
 
 // --- Gesture handling ---
@@ -209,23 +211,6 @@ function registerIpcHandlers(): void {
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         overlayWindow.webContents.send('overlay:set-cursor', point.x, point.y)
       }
-
-      // Forward to debug window
-      if (debugWindow && !debugWindow.isDestroyed()) {
-        debugWindow.webContents.send('debug:data', {
-          type: 'gaze',
-          point
-        })
-      }
-
-      // Broadcast tracking state with live data to main window
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('tracking:state', {
-          enabled: trackingEnabled,
-          fps: 0, // Will be updated by debug data
-          confidence: point.confidence
-        })
-      }
     }
   )
 
@@ -236,14 +221,10 @@ function registerIpcHandlers(): void {
     })
   })
 
-  // Tracking window -> main: debug data
+  // Tracking window -> main: debug data — forward to main window
   ipcMain.on('tracking:debug-data', (_event, data: any) => {
-    if (debugWindow && !debugWindow.isDestroyed()) {
-      debugWindow.webContents.send('debug:data', data)
-    }
-
-    // Also update main window with FPS/confidence from debug data
     if (mainWindow && !mainWindow.isDestroyed() && data) {
+      mainWindow.webContents.send('debug:data', data)
       mainWindow.webContents.send('tracking:state', {
         enabled: trackingEnabled,
         fps: data.fps ?? 0,
@@ -252,14 +233,23 @@ function registerIpcHandlers(): void {
     }
   })
 
-  // Calibration IPC
+  // Calibration IPC — forward points to tracking window for WebGazer training
   ipcMain.handle('calibration:record-point', (_event, x: number, y: number) => {
     console.log(`[gaze-pilot] Calibration point recorded: (${x}, ${y})`)
+    // Forward to tracking window so WebGazer can train on this point
+    if (trackingWindow && !trackingWindow.isDestroyed()) {
+      trackingWindow.webContents.send('calibration:point', x, y)
+    }
     return { ok: true }
   })
 
   ipcMain.handle('calibration:finish', () => {
     console.log('[gaze-pilot] Calibration finished')
+    // Close the calibration window
+    if (calibrationWindow && !calibrationWindow.isDestroyed()) {
+      calibrationWindow.close()
+      calibrationWindow = null
+    }
     return { ok: true }
   })
 
@@ -269,14 +259,15 @@ function registerIpcHandlers(): void {
     return { enabled: trackingEnabled }
   })
 
-  ipcMain.handle('debug:toggle', () => {
-    toggleDebugWindow()
-    return { open: debugWindow !== null }
-  })
-
   ipcMain.handle('calibration:start', () => {
-    if (trackingWindow && !trackingWindow.isDestroyed()) {
-      trackingWindow.webContents.send('calibration:start')
+    if (!trackingEnabled) {
+      return { ok: false, error: 'Tracking must be enabled first' }
+    }
+    // Create a fullscreen calibration window
+    if (calibrationWindow && !calibrationWindow.isDestroyed()) {
+      calibrationWindow.focus()
+    } else {
+      calibrationWindow = createCalibrationWindow()
     }
     return { ok: true }
   })

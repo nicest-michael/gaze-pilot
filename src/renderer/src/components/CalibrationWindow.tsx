@@ -20,19 +20,20 @@ export function CalibrationWindow(): JSX.Element {
 
   const advancePoint = useCallback(() => {
     const point = CALIBRATION_POINTS[currentIndex]
-    const screenX = point.x * window.innerWidth
-    const screenY = point.y * window.innerHeight
+    const screenX = point.x * window.screen.width
+    const screenY = point.y * window.screen.height
     window.api.recordCalibrationPoint(screenX, screenY)
 
     const nextIndex = currentIndex + 1
     if (nextIndex >= CALIBRATION_POINTS.length) {
-      window.api.finishCalibration()
       setActive(false)
       setComplete(true)
       setCurrentIndex(0)
       setProgress(0)
-      // Show completion message briefly before hiding
-      setTimeout(() => setComplete(false), 1500)
+      // Show completion briefly, then close via finishCalibration
+      setTimeout(() => {
+        window.api.finishCalibration()
+      }, 1200)
     } else {
       setCurrentIndex(nextIndex)
       setProgress(0)
@@ -62,21 +63,28 @@ export function CalibrationWindow(): JSX.Element {
     return () => cancelAnimationFrame(rafRef.current)
   }, [active, currentIndex, advancePoint])
 
-  // Listen for calibration start from main
+  // Listen for calibration start from main process
   useEffect(() => {
     const cleanup = window.api.onStartCalibration(() => {
       setCurrentIndex(0)
       setProgress(0)
+      setComplete(false)
       setActive(true)
     })
     return cleanup
   }, [])
 
-  if (!active && !complete) return <></>
+  if (!active && !complete) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="text-white/40 text-sm font-mono">Preparing calibration...</div>
+      </div>
+    )
+  }
 
   if (complete) {
     return (
-      <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="text-green-400 text-2xl font-mono animate-pulse">
           Calibration Complete!
         </div>
@@ -85,7 +93,7 @@ export function CalibrationWindow(): JSX.Element {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black flex items-center justify-center">
       {/* Instructions */}
       <div className="absolute top-8 left-1/2 -translate-x-1/2 text-white/70 text-sm font-mono">
         Stare at each dot for 2 seconds ({currentIndex + 1}/{CALIBRATION_POINTS.length})

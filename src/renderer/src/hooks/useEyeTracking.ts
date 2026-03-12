@@ -281,4 +281,20 @@ export function useEyeTracking(): void {
       stopTracking()
     }
   }, [startTracking, stopTracking])
+
+  // Listen for calibration points and feed them to WebGazer
+  useEffect(() => {
+    const cleanup = window.api.onCalibrationPoint((x: number, y: number) => {
+      const r = refs.current
+      if (r.webgazerReady && r.webgazerModule) {
+        try {
+          r.webgazerModule.recordScreenPosition(x, y, 'click')
+          console.log(`[gaze-pilot] WebGazer calibration point: (${x}, ${y})`)
+        } catch (err) {
+          console.error('[gaze-pilot] Failed to record calibration point:', err)
+        }
+      }
+    })
+    return cleanup
+  }, [])
 }
