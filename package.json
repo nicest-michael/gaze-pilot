@@ -1,0 +1,59 @@
+{
+  "name": "gaze-pilot",
+  "version": "1.0.0",
+  "description": "Eye tracking app with gaze cursor, wink gestures, and voice typing control",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "build:win": "electron-vite build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.gazepilot.app",
+    "productName": "Gaze Pilot",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.32",
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "webgazer": "^3.5.3",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "^40.7.0",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^5.0.0",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3"
+  }
+}

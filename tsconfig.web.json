@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "target": "ESNext",
+    "outDir": "./dist",
+    "rootDir": ".",
+    "types": ["electron-vite/client"],
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["./src/renderer/src/*"]
+    }
+  },
+  "include": ["src/renderer/src/**/*"]
+}
